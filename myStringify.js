@@ -1,5 +1,3 @@
-
-
 function myStringify(value, space) {
     let indentStr = null;
 
@@ -10,8 +8,21 @@ function myStringify(value, space) {
 
     const usedObjects = new WeakSet();
 
-    function stringifyRecursive(value, indentLevel) {
+    function escapeString(str) {
+        return str
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t')
+            .replace(/\b/g, '\\b')
+            .replace(/\f/g, '\\f')
+            .replace(/[\u0000-\u001F]/g, char => {
+                return '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0');
+            });
+    }
 
+    function stringifyRecursive(value, indentLevel) {
         let currentIndent = '';
         let parentIndent = '';
 
@@ -31,8 +42,11 @@ function myStringify(value, space) {
             if (valueType === 'undefined' || valueType === 'symbol' || valueType === 'function')
                 return;
             if (valueType === 'string')
-                return `"${value}"`;
-            return String(value);
+                return `"${escapeString(value)}"`;
+            if (valueType === 'number') {
+                if (Number.isFinite(value)) return String(value);
+                return 'null';
+            }
         }
 
         if (usedObjects.has(value))
@@ -52,19 +66,18 @@ function myStringify(value, space) {
             return String(value);
 
         if (accurateType === '[object String]')
-            return '"' + String(value) + '"';
+            return '"' + escapeString(String(value)) + '"';
 
         if (Array.isArray(value)) {
             let result = '[';
             let array = [];
             for (let item of value) {
-                if (typeof (item) === 'undefined') {
-                    array.push('null');
-                    continue;
-                }
-
                 let nestedResult = stringifyRecursive(item, indentLevel + 1);
-                array.push(nestedResult);
+                if (nestedResult === undefined) {
+                    array.push('null');
+                } else {
+                    array.push(nestedResult);
+                }
             }
 
             if (array.length === 0) return '[]';
@@ -76,16 +89,17 @@ function myStringify(value, space) {
         let result = '{';
         let objectsEntries = [];
 
-        for (let key in value) {
+        for (const key of Object.keys(value)) {
             let fieldType = typeof (value[key]);
 
             if (fieldType === 'function' || fieldType === 'symbol' || fieldType === 'undefined')
                 continue;
 
             let nestedResult = stringifyRecursive(value[key], indentLevel + 1);
+            if (nestedResult === undefined) continue;
 
             let separator = indentStr ? ': ' : ':';
-            objectsEntries.push('"' + key + '"' + separator + nestedResult);
+            objectsEntries.push('"' + escapeString(key) + '"' + separator + nestedResult);
         }
 
         if (objectsEntries.length === 0) return '{}';
@@ -98,3 +112,4 @@ function myStringify(value, space) {
 }
 
 module.exports = { myStringify };
+
