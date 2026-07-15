@@ -15,7 +15,7 @@ function myStringify(value, space) {
             .replace(/\n/g, '\\n')
             .replace(/\r/g, '\\r')
             .replace(/\t/g, '\\t')
-            .replace(/[\b]/g, '\\b')    // <-- ИСПРАВЛЕНО: [\b] вместо \b
+            .replace(/[\b]/g, '\\b')    
             .replace(/\f/g, '\\f')
             .replace(/[\u0000-\u001F]/g, char => {
                 return '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0');
@@ -47,6 +47,7 @@ function myStringify(value, space) {
                 if (Number.isFinite(value)) return String(value);
                 return 'null';
             }
+            if (valueType === 'boolean') return String(value);
         }
 
         if (usedObjects.has(value))
