@@ -72,6 +72,16 @@ describe('myStringify', () => {
         test('RegExp возвращает пустой объект', () => {
             expect(myStringify(/abc/g)).toBe('{}');
         });
+
+        test('многоуровневое наследование', () => {
+            const grandpa = { a: 1 };
+            const parent = Object.create(grandpa);
+            parent.b = 2;
+            const child = Object.create(parent);
+            child.c = 3;
+        
+            expect(myStringify(child)).toBe('{"c":3}');
+        });
     });
 
     describe('toJSON', () => {
@@ -87,4 +97,5 @@ describe('myStringify', () => {
             expect(result).toBe('{\n  "a": 1\n}');
         });
     });
+    
 });

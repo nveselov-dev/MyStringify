@@ -1,12 +1,16 @@
 function myStringify(value, space) {
     let indentStr = null;
 
-    if (typeof (space) === 'number')
-        indentStr = ' '.repeat(Math.min(space, 10));
+    if (typeof (space) === 'number') {
+        if (space > 0) {
+            indentStr = ' '.repeat(Math.min(space, 10));
+        }
+    }
+
     if (typeof (space) === 'string')
         space.length <= 10 ? indentStr = space : indentStr = space.slice(0, 10);
 
-    const usedObjects = new WeakSet();
+    const path = new Set();
 
     function escapeString(str) {
         return str
@@ -15,8 +19,10 @@ function myStringify(value, space) {
             .replace(/\n/g, '\\n')
             .replace(/\r/g, '\\r')
             .replace(/\t/g, '\\t')
-            .replace(/[\b]/g, '\\b')    
+            .replace(/[\b]/g, '\\b')
             .replace(/\f/g, '\\f')
+            .replace(/\u2028/g, '\\u2028')
+            .replace(/\u2029/g, '\\u2029')
             .replace(/[\u0000-\u001F]/g, char => {
                 return '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0');
             });
@@ -50,67 +56,75 @@ function myStringify(value, space) {
             if (valueType === 'boolean') return String(value);
         }
 
-        if (usedObjects.has(value))
+        if (path.has(value))
             throw new TypeError("Self link object");
 
-        usedObjects.add(value);
+        path.add(value);
 
-        if (typeof value.toJSON === 'function')
-            return stringifyRecursive(value.toJSON(), indentLevel);
+        try {
+            if (typeof value.toJSON === 'function')
+                return stringifyRecursive(value.toJSON(), indentLevel);
 
-        let accurateType = Object.prototype.toString.call(value);
+            let accurateType = Object.prototype.toString.call(value);
 
-        if (accurateType === '[object RegExp]' || accurateType === '[object Map]' || accurateType === '[object Set]')
-            return '{}';
+            if (accurateType === '[object RegExp]' || accurateType === '[object Map]' || accurateType === '[object Set]')
+                return '{}';
 
-        if (accurateType === '[object Number]' || accurateType === '[object Boolean]')
-            return String(value);
-
-        if (accurateType === '[object String]')
-            return '"' + escapeString(String(value)) + '"';
-
-        if (Array.isArray(value)) {
-            let result = '[';
-            let array = [];
-            for (let item of value) {
-                let nestedResult = stringifyRecursive(item, indentLevel + 1);
-                if (nestedResult === undefined) {
-                    array.push('null');
-                } else {
-                    array.push(nestedResult);
-                }
+            if (accurateType === '[object Number]') {
+                if (Number.isFinite(value)) return String(value);
+                return 'null';
             }
 
-            if (array.length === 0) return '[]';
+            if (accurateType === '[object Boolean]')
+                return String(value);
 
-            result += currentIndent + array.join(',' + currentIndent) + parentIndent + ']';
+            if (accurateType === '[object String]')
+                return '"' + escapeString(String(value)) + '"';
+
+            if (Array.isArray(value)) {
+                let result = '[';
+                let array = [];
+                for (let item of value) {
+                    let nestedResult = stringifyRecursive(item, indentLevel + 1);
+                    if (nestedResult === undefined) {
+                        array.push('null');
+                    } else {
+                        array.push(nestedResult);
+                    }
+                }
+
+                if (array.length === 0) return '[]';
+
+                result += currentIndent + array.join(',' + currentIndent) + parentIndent + ']';
+                return result;
+            }
+
+            let result = '{';
+            let objectsEntries = [];
+
+            for (const key of Object.keys(value)) {
+                let fieldType = typeof (value[key]);
+
+                if (fieldType === 'function' || fieldType === 'symbol' || fieldType === 'undefined')
+                    continue;
+
+                let nestedResult = stringifyRecursive(value[key], indentLevel + 1);
+                if (nestedResult === undefined) continue;
+
+                let separator = indentStr ? ': ' : ':';
+                objectsEntries.push('"' + escapeString(key) + '"' + separator + nestedResult);
+            }
+
+            if (objectsEntries.length === 0) return '{}';
+
+            result += currentIndent + objectsEntries.join(',' + currentIndent) + parentIndent + '}';
             return result;
+        } finally {
+            path.delete(value);
         }
-
-        let result = '{';
-        let objectsEntries = [];
-
-        for (const key of Object.keys(value)) {
-            let fieldType = typeof (value[key]);
-
-            if (fieldType === 'function' || fieldType === 'symbol' || fieldType === 'undefined')
-                continue;
-
-            let nestedResult = stringifyRecursive(value[key], indentLevel + 1);
-            if (nestedResult === undefined) continue;
-
-            let separator = indentStr ? ': ' : ':';
-            objectsEntries.push('"' + escapeString(key) + '"' + separator + nestedResult);
-        }
-
-        if (objectsEntries.length === 0) return '{}';
-
-        result += currentIndent + objectsEntries.join(',' + currentIndent) + parentIndent + '}';
-        return result;
     }
 
     return stringifyRecursive(value, 0);
 }
 
 module.exports = { myStringify };
-
